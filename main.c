@@ -3,21 +3,34 @@
 #include <stdbool.h>
 
 #define HEAP_CAPACITY 1024*1024
-#define HEAP_ALLOCATED_CAPACITY 1024
+#define CHUNK_LIST_CAPACITY 1024
 
 typedef struct {
     void* start;
     size_t size;
-} heap_chuck;
+} chunk;
+
+typedef struct {
+    size_t count;
+    chunk chunks[CHUNK_LIST_CAPACITY];
+} chunk_list;
 
 char heap[HEAP_CAPACITY] = {0};
-heap_chuck heap_allocated_chucks[HEAP_ALLOCATED_CAPACITY];
 size_t heap_size = 0;
-size_t heap_allocated_size = 0;
+
+chunk_list allocated_chunks = {0};
+chunk_list freed_chunks = {0};
 
 // ---------------------------------
 void* heap_alloc(size_t size);
 void get_chunks_info(void);
+void heap_free(void* ptr);
+
+// ---------------------------------
+chunk_list_insert(chunk_list* list, void* ptr, size_t size);
+chunk_list_find(const chunk_list* list, size_t size);
+chunk_list_delete(chunk_list* list, size_t size);
+
 
 int main() {
     for (size_t i = 0; i < 1024; ++i) {
@@ -40,22 +53,29 @@ void* heap_alloc(size_t size) {
     }
 
     assert(heap_size + size <= HEAP_CAPACITY);
-    void* result = heap + heap_size;
+    void* ptr = heap + heap_size;
     heap_size += size;
 
-    const heap_chuck chuck = {
-        .start = result,
-        .size = size,
-    };
-    assert(heap_allocated_size < HEAP_ALLOCATED_CAPACITY);
-    heap_allocated_chucks[heap_allocated_size++] = chuck;
-
-    return result;
+    chunk_list_insert(&allocated_chunks, ptr, size);
+    return ptr;
 }
 
 void get_chunks_info(void) {
-    printf("--------------allocated chunks--------------\n");
-    for (size_t i = 0; i < heap_allocated_size; ++i) {
-        printf("start: %p, size: %zu\n", heap_allocated_chucks[i].start, heap_allocated_chucks[i].size);
+    if (allocated_chunks.count > 0) {
+        printf("--------------allocated chunks--------------\n");
+        for (size_t i = 0; i < allocated_chunks.count; ++i) {
+            printf("start: %p, size: %zu\n", allocated_chunks.chunks[i].start, allocated_chunks.chunks[i].size);
+        }
     }
+
+    if (freed_chunks.count > 0) {
+        printf("--------------freed chunks--------------\n");
+        for (size_t i = 0; i < freed_chunks.count; ++i) {
+            printf("start: %p, size: %zu\n", freed_chunks.chunks[i].start, freed_chunks.chunks[i].size);
+        }
+    }
+}
+
+void heap_free(void* ptr) {
+    
 }
