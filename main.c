@@ -30,14 +30,14 @@ void error(const char* message);
 
 // ---------------------------------
 void* heap_alloc(size_t size);
-void get_chunks_info(void);
 void heap_free(void* ptr);
 
 // ---------------------------------
+void get_chunks_info(void);
 void chunk_list_insert(chunk_list* list, chunk c);
 int chunk_list_find(const chunk_list* list, void* ptr);
 void chunk_list_delete(chunk_list* list, size_t index);
-
+void chunk_list_coalesce(chunk_list* list);
 
 int main() {
     for (size_t i = 0; i < 10; ++i) {
@@ -118,6 +118,7 @@ void heap_free(void* ptr) {
 
     chunk_list_insert(&freed_chunks, allocated_chunks.chunks[index]);
     chunk_list_delete(&allocated_chunks, index);
+    chunk_list_coalesce(&freed_chunks);
 }
 
 void chunk_list_insert(chunk_list* list, chunk c) {
@@ -144,15 +145,13 @@ int chunk_compare(const void* a, const void* b) {
 
 int chunk_list_find(const chunk_list* list, void* ptr) {
     // returns the index of chunk
-
     chunk key = {
         .ptr = ptr,
     };
 
     chunk* result = (chunk*)bsearch(&key, list->chunks, list->count, sizeof(list->chunks[0]), chunk_compare);
-    if (result == NULL) return -1;
 
-    return (result - list->chunks);
+    return (result == NULL) ? -1 : (result - list->chunks);
 }
 
 void chunk_list_delete(chunk_list* list, size_t index) {
@@ -163,4 +162,25 @@ void chunk_list_delete(chunk_list* list, size_t index) {
     }
 
     list->count--;
+}
+
+void chunk_list_coalesce(chunk_list* list) {
+    // marge consecutive free chunks into one free chunk
+    // if the pointer to a chunk + the size == the pointer to chunk after that they can be merged
+    // to merge them simply add their sizes and delete one of them
+    size_t i = 0;
+    
+    while (i + 1 < list->count) {
+        chunk* current = &list->chunks[i];
+        chunk* next = &list->chunks[i + 1];
+        
+        if ((char*)current->ptr + current->size != next->ptr) {
+            i++;
+            continue;
+        }
+        
+        // do not increment i in case of merge because more than two adjacent free chunks could be present
+        current->size += next->size;
+        chunk_list_delete(list, i + 1);
+    }
 }
