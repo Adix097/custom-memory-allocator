@@ -1,15 +1,28 @@
 CC = gcc
 GDB = gdb
+
 CFLAGS = -Wall -Wextra -std=c11 -pedantic -ggdb
+CPPFLAGS = -Iinclude
 
-heap.out: main.c
-	$(CC) $(CFLAGS) -o heap.out main.c
+TARGET = build/heap.out
 
-run: heap.out
-	./heap.out
+SRC = $(wildcard src/*.c)
+OBJ = $(SRC:src/%.c=build/%.o)
 
-debug: heap.out
-	$(GDB) -tui ./heap.out
+$(TARGET): $(OBJ)
+	$(CC) $(CFLAGS) $(OBJ) -o $@
+
+build/%.o: src/%.c | build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+build:
+	mkdir -p build
+
+run: $(TARGET)
+	./$(TARGET)
+
+debug: $(TARGET)
+	$(GDB) -tui ./$(TARGET)
 
 clean:
-	rm -f *.out
+	rm -rf build
