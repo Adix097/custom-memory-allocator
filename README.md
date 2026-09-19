@@ -102,4 +102,4 @@ If two free chunks become physically adjacent, they are merged:
 | `Makefile`          | Build, run and debug automation       |
 | `docs/`             | Detailed documentation                |
 
-for more detailed explaination check out: `docs/`
+for more detailed explaination check out: [Docs](docs/)
