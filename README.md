@@ -102,4 +102,42 @@ If two free chunks become physically adjacent, they are merged:
 | `Makefile`          | Build, run and debug automation       |
 | `docs/`             | Detailed documentation                |
 
-for more detailed explaination check out: [Docs](docs/)
+## Comparison with Real malloc() / free()
+| Aspect | This Project | Real-world `malloc()` / `free()` (e.g glibc) |
+| **Memory source** | One fixed **1 MiB static array**, sized at compile time | Requests memory from the OS dynamically via mechanisms such as `brk()`/`sbrk()` and `mmap()` |
+| **Bookkeeping storage** | Metadata (`ptr`, `size`) lives in separate global arrays, entirely outside the user's allocated memory. | Metadata such as size, flags, and free-list pointers is normally stored **inside allocator-managed memory**, typically in a chunk header near the returned pointer. |
+| **Fit strategy**               | **First-fit** — scans the free list and chooses the first block large enough.                               | Uses more sophisticated size-based strategies and different paths depending on allocation size and bin type.
+| **Splitting**                  | A larger free block is split into the requested allocation plus a leftover free block.                      | Similar principle |
+| **Coalescing**                 | performed immediately during every `heap_free()`, scanning the free list for adjacent chunks.   | Generally checks **physically adjacent chunks** using allocator metadata rather than scanning the entire free list. Some allocators also defer or limit coalescing for performance.                                                        |
+| **Concurrency**                | None. The allocator is single-threaded and has no synchronization.                                          | Production allocators support multithreading using mechanisms such as arenas, thread-local caches, and synchronization around shared structures.                                                                                           |
+| **Alignment**                  | Not handled. Returns raw offsets into the `char` array, with no guaranteed alignment for arbitrary C types. | Guarantees suitable alignment for allocated objects.                                                                                                                                 |
+| **Handling invalid `free()`**  | Unknown pointers produce an error message and are rejected.   | Passing an invalid pointer to `free()` is **undefined behavior**.                                            |
+
+This project:
+
+   heap[] (just raw bytes, no headers at all)
+   ┌─────────────────────────────────────────────┐
+   │        (data)         │      (data)         │
+   └─────────────────────────────────────────────┘
+
+   allocated_chunks (elsewhere in memory, a separate array)
+   [ {ptr → data1, size=100}, {ptr → data2, size=50}, ... ]
+
+Real malloc:
+
+   ┌────────┬────────────────────┬────────┬─────────────────────┐
+   │ header │   user's 100 bytes │ header │  user's 50 bytes    │
+   │ (size, │   (this is what    │ (size, │  (this is what      │
+   │ flags) │   malloc returns   │ flags) │  malloc returns     │
+   │        │   a pointer to)    │        │  a pointer to)      │
+   └────────┴────────────────────┴────────┴─────────────────────┘
+              ↑
+        malloc() returns *this* address, not the header's address.
+        free(ptr) works by looking a few bytes *before* ptr to read the header.
+
+real free(ptr) doesn't need to search any list at all to find the chunk's size it can just reads the header living right next to the pointer, in O(1), whereas this project must binary-search a separate array (O(log n)) to find where a given pointer's bookkeeping lives.
+
+## other strategies:
+First-fit: fast to reason about, but over time tends to leave small unusable fragments near the front of the free list, since the front gets "picked over" first.
+Best-fit: scans for the smallest block that still fits, minimizing wasted space per allocation, but can be slower and, ironically, tends to create lots of tiny leftover slivers (since it keeps picking blocks that barely fit).
+Segregated/size-class free lists (what glibc, jemalloc, tcmalloc effectively use): keep separate lists per size range (e.g., "8–16 bytes," "17–32 bytes," etc.) so a request can jump straight to a list of already-correctly-sized blocks — this is how production allocators get near O(1) allocation for common sizes instead of scanning.
