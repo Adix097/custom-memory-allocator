@@ -103,16 +103,18 @@ If two free chunks become physically adjacent, they are merged:
 | `docs/`             | Detailed documentation                |
 
 ## Comparison with Real malloc() / free()
-| Aspect | This Project | Real-world `malloc()` / `free()` (e.g glibc) |
+| Aspect | This Project | Real-world `malloc()` / `free()` (e.g. glibc) |
+|---|---|---|
 | **Memory source** | One fixed **1 MiB static array**, sized at compile time | Requests memory from the OS dynamically via mechanisms such as `brk()`/`sbrk()` and `mmap()` |
-| **Bookkeeping storage** | Metadata (`ptr`, `size`) lives in separate global arrays, entirely outside the user's allocated memory. | Metadata such as size, flags, and free-list pointers is normally stored **inside allocator-managed memory**, typically in a chunk header near the returned pointer. |
-| **Fit strategy**               | **First-fit** — scans the free list and chooses the first block large enough.                               | Uses more sophisticated size-based strategies and different paths depending on allocation size and bin type.
-| **Splitting**                  | A larger free block is split into the requested allocation plus a leftover free block.                      | Similar principle |
-| **Coalescing**                 | performed immediately during every `heap_free()`, scanning the free list for adjacent chunks.   | Generally checks **physically adjacent chunks** using allocator metadata rather than scanning the entire free list. Some allocators also defer or limit coalescing for performance.                                                        |
-| **Concurrency**                | None. The allocator is single-threaded and has no synchronization.                                          | Production allocators support multithreading using mechanisms such as arenas, thread-local caches, and synchronization around shared structures.                                                                                           |
-| **Alignment**                  | Not handled. Returns raw offsets into the `char` array, with no guaranteed alignment for arbitrary C types. | Guarantees suitable alignment for allocated objects.                                                                                                                                 |
-| **Handling invalid `free()`**  | Unknown pointers produce an error message and are rejected.   | Passing an invalid pointer to `free()` is **undefined behavior**.                                            |
+| **Bookkeeping storage** | Metadata (`ptr`, `size`) lives in separate global arrays, entirely outside the user's allocated memory. | Metadata such as size, flags, and free-list pointers is normally stored inside allocator-managed memory, typically in a chunk header near the returned pointer. |
+| **Fit strategy** | **First-fit** — scans the free list and chooses the first block large enough. | Uses more sophisticated size-based strategies and different paths depending on allocation size and bin type. |
+| **Splitting** | A larger free block is split into the requested allocation plus a leftover free block. | Similar principle. |
+| **Coalescing** | Performed immediately during every `heap_free()`, scanning the free list for adjacent chunks. | Generally checks **physically adjacent chunks** using allocator metadata rather than scanning the entire free list. Some allocators also defer or limit coalescing for performance. |
+| **Concurrency** | None. The allocator is single-threaded and has no synchronization. | Production allocators support multithreading using mechanisms such as arenas, thread-local caches, and synchronization around shared structures. |
+| **Alignment** | Not handled. Returns raw offsets into the `char` array, with no guaranteed alignment for arbitrary C types. | Guarantees suitable alignment for allocated objects. |
+| **Handling invalid `free()`** | Unknown pointers produce an error message and are rejected. | Passing an invalid pointer to `free()` is **undefined behavior**. |                                            |
 
+```text
 This project:
 
    heap[] (just raw bytes, no headers at all)
@@ -134,6 +136,7 @@ Real malloc:
               ↑
         malloc() returns *this* address, not the header's address.
         free(ptr) works by looking a few bytes *before* ptr to read the header.
+```
 
 real free(ptr) doesn't need to search any list at all to find the chunk's size it can just reads the header living right next to the pointer, in O(1), whereas this project must binary-search a separate array (O(log n)) to find where a given pointer's bookkeeping lives.
 
