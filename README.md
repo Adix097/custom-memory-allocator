@@ -141,6 +141,6 @@ Real malloc:
 real free(ptr) doesn't need to search any list at all to find the chunk's size it can just reads the header living right next to the pointer, in O(1), whereas this project must binary-search a separate array (O(log n)) to find where a given pointer's bookkeeping lives.
 
 ## other strategies:
-First-fit: fast to reason about, but over time tends to leave small unusable fragments near the front of the free list, since the front gets "picked over" first.
-Best-fit: scans for the smallest block that still fits, minimizing wasted space per allocation, but can be slower and, ironically, tends to create lots of tiny leftover slivers (since it keeps picking blocks that barely fit).
-Segregated/size-class free lists (what glibc, jemalloc, tcmalloc effectively use): keep separate lists per size range (e.g., "8–16 bytes," "17–32 bytes," etc.) so a request can jump straight to a list of already-correctly-sized blocks — this is how production allocators get near O(1) allocation for common sizes instead of scanning.
+- **First-fit:** fast to reason about, but over time tends to leave small unusable fragments near the front of the free list, since the front gets "picked over" first.
+- **Best-fit:** scans for the smallest block that still fits, minimizing wasted space per allocation, but can be slower and, ironically, tends to create lots of tiny leftover slivers (since it keeps picking blocks that barely fit).
+- **Segregated/size-class free lists (what glibc, jemalloc, tcmalloc effectively use):** keep separate lists per size range (e.g., "8–16 bytes," "17–32 bytes," etc.) so a request can jump straight to a list of already-correctly-sized blocks — this is how production allocators get near O(1) allocation for common sizes instead of scanning.
